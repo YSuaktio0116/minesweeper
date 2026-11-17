@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>Minesweeper</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#151d31;--panel2:#1c2740;--line:#2b3854;--text:#edf2ff;--muted:#9aa9c4;--accent:#83a9ff;--cell:32px}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#182543 0,#0b1020 55%);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+.app{max-width:1100px;margin:auto;padding:24px 18px 40px}.header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px}.brand{font-size:26px;font-weight:850;letter-spacing:-1.2px}.brand span{color:var(--accent)}.tag{color:var(--muted);font-size:12px}
+.panel{background:rgba(21,29,49,.92);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 12px 35px #0002}
+.settings{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}
+label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:12px}
+select,input{width:100%;min-width:0;background:#0e172a;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px;font:inherit}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);border-radius:10px;background:#202c45;color:var(--text);padding:10px 13px;font-weight:650}
+.btn.primary{background:#426bc1;border-color:#628be0}.btn:hover{filter:brightness(1.12)}.btn:disabled{opacity:.45;cursor:not-allowed}
+.custom{display:none;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.custom.show{display:grid}
+.stats{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;text-align:center;gap:12px}
+.stat strong{display:block;font-size:27px;font-variant-numeric:tabular-nums;letter-spacing:1px}.stat small{color:var(--muted);font-size:10px;letter-spacing:1.2px}
+.face{width:46px;height:46px;border-radius:13px;background:#202c45;border:1px solid var(--line);font-size:23px}
+.status{text-align:center;color:var(--muted);min-height:24px;margin:8px 0 0}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.tools{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.zoom-label{color:var(--muted);font-size:12px;min-width:46px;text-align:center}
+.board-shell{overflow:auto;max-width:100%;max-height:68vh;border:1px solid var(--line);border-radius:12px;background:#0b1325;overscroll-behavior:contain;touch-action:pan-x pan-y}
+.board{display:grid;gap:2px;width:max-content;padding:8px;user-select:none}
+.cell{width:var(--cell);height:var(--cell);padding:0;border-radius:4px;border:1px solid #34425e;background:#263550;color:#fff;font-weight:800;font-size:calc(var(--cell)*.48);display:flex;align-items:center;justify-content:center;line-height:1;touch-action:manipulation}
+.cell.closed{box-shadow:inset 0 -2px 0 #17243b,inset 0 1px 0 #52627d}
+.cell.closed:active{background:#405578}.cell.open{background:#111c30;border-color:#1d2a42}.cell.flag{font-size:calc(var(--cell)*.53)}.cell.mine{background:#b63d52;border-color:#e36a7e}.cell.hit{background:#7e1f37}
+.n1{color:#72a8ff}.n2{color:#66d6a0}.n3{color:#ff7777}.n4{color:#b4a0ff}.n5{color:#ffb66d}.n6{color:#66dce5}.n7{color:#f1f3f8}.n8{color:#9ba9bc}
+.help{color:var(--muted);font-size:12px;margin-top:12px}.hidden{display:none!important}
+@media(max-width:650px){.app{padding:16px 10px 28px}.settings{grid-template-columns:repeat(2,minmax(0,1fr))}.custom{grid-template-columns:repeat(2,minmax(0,1fr))}.header{align-items:flex-start}.brand{font-size:23px}.board-shell{max-height:62vh}.panel{padding:12px}}
+</style>
+</head>
+<body>
+<main class="app">
+ <header class="header"><div><div class="brand">Minesweeper<span>.</span></div><div class="tag">A clean, customizable classic</div></div><button class="btn" id="newGameTop">↻ New game</button></header>
+ <section class="panel">
+  <div class="settings">
+   <label>難易度<select id="level">
+    <option value="beginner">初級 · 9×9 / 10</option>
+    <option value="intermediate">中級 · 16×16 / 40</option>
+    <option value="expert">上級 · 16×30 / 99</option>
+    <option value="advanced">超上級 · 30×30 / 270</option>
+    <option value="large">巨大 · 50×50 / 1,000</option>
+    <option value="huge" selected>超巨大 · 100×100 / 1,000</option>
+    <option value="custom">カスタム</option>
+   </select></label>
+   <label>操作モード<select id="mode"><option value="open">開くモード</option><option value="flag">旗モード</option></select></label>
+   <button class="btn primary" id="apply">ゲーム開始</button>
+   <button class="btn" id="reset">リスタート</button>
+  </div>
+  <div class="custom" id="customFields">
+   <label>縦（行）<input id="rows" type="number" min="5" max="100" value="100"></label>
+   <label>横（列）<input id="cols" type="number" min="5" max="100" value="100"></label>
+   <label>地雷数<input id="mineCount" type="number" min="1" value="1000"></label>
+  </div>
+ </section>
+ <section class="panel">
+  <div class="stats">
+   <div class="stat"><strong id="remaining">1000</strong><small>MINES LEFT</small></div>
+   <button class="face" id="face" title="リスタート">🙂</button>
+   <div class="stat"><strong id="timer">000</strong><small>TIME</small></div>
+  </div>
+  <div class="status" id="status">マスを開いてゲーム開始</div>
+ </section>
+ <section class="panel">
+  <div class="toolbar">
+   <div class="tools"><button class="btn" id="zoomOut">−</button><span class="zoom-label" id="zoomValue">100%</span><button class="btn" id="zoomIn">＋</button><button class="btn" id="zoomReset">標準サイズ</button></div>
+   <div class="tools"><button class="btn" id="flagToggle">⚑ 旗モード</button><button class="btn" id="helpToggle">操作方法</button></div>
+  </div>
+  <div class="board-shell" id="shell"><div class="board" id="board" aria-label="マインスイーパ盤面"></div></div>
+  <div class="help hidden" id="help">PC：左クリックで開く、右クリックで旗。開いた数字をクリックすると、周囲の旗が数字以上の場合に旗以外を開きます。スマホ：操作モードを切り替えてください。空白マスを開くと周囲の空白領域も自動で開きます。地雷以外のマスをすべて開くとクリアです。</div>
+ </section>
+ <div class="tag">盤面は最大100×100。ズームとスクロールに対応。</div>
+</main>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const presets={beginner:[9,9,10],intermediate:[16,16,40],expert:[16,30,99],advanced:[30,30,270],large:[50,50,1000],huge:[100,100,1000]};
+let rows=100,cols=100,mines=1000,data=[],started=false,ended=false,flagged=0,seconds=0,timer=null,first=-1,zoom=1;
+const around=i=>{const r=Math.floor(i/cols),c=i%cols,a=[];for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;let y=r+dr,x=c+dc;if(y>=0&&y<rows&&x>=0&&x<cols)a.push(y*cols+x)}return a};
+const fmt=n=>String(n).padStart(3,'0');
+function setStatus(s){$('status').textContent=s}
+function updateStats(){$('remaining').textContent=mines-flagged;$('timer').textContent=fmt(seconds)}
+function stopTimer(){if(timer){clearInterval(timer);timer=null}}
+function startTimer(){if(timer)return;timer=setInterval(()=>{seconds=Math.min(999999,seconds+1);$('timer').textContent=fmt(seconds)},1000)}
+function createBoard(){
+ stopTimer();data=Array.from({length:rows*cols},()=>({mine:false,open:false,flag:false,n:0}));
+ started=false;ended=false;flagged=0;seconds=0;first=-1;$('face').textContent='🙂';updateStats();setStatus('マスを開いてゲーム開始');render();
+}
+function render(){
+ const board=$('board');board.innerHTML='';board.style.gridTemplateColumns=`repeat(${cols},var(--cell))`;
+ const frag=document.createDocumentFragment();
+ data.forEach((v,i)=>{
+  const b=document.createElement('button');b.type='button';b.className='cell '+(v.open?'open':'closed');
+  if(v.flag&&!v.open){b.textContent='🚩';b.classList.add('flag')}
+  else if(v.open&&v.mine){b.textContent='✹';b.classList.add('mine');if(i===first)b.classList.add('hit')}
+  else if(v.open&&v.n){b.textContent=v.n;b.classList.add('n'+v.n)}
+  b.setAttribute('aria-label',v.flag?'旗':v.open?(v.mine?'地雷':v.n?`数字${v.n}`:'空白'):'未開封');
+  b.addEventListener('click',()=>handleClick(i));
+  b.addEventListener('contextmenu',e=>{e.preventDefault();toggleFlag(i)});
+  frag.appendChild(b);
+ });board.appendChild(frag);
+}
+function plantMines(safe){
+ const safeSet=new Set([safe,...around(safe)]);let candidates=[];
+ for(let i=0;i<data.length;i++)if(!safeSet.has(i))candidates.push(i);
+ // If the requested density leaves too few cells outside the first-click neighborhood,
+ // preserve the first-click cell and allow mines in its surrounding cells.
+ if(candidates.length<mines){candidates=[];for(let i=0;i<data.length;i++)if(i!==safe)candidates.push(i)}
+ for(let i=candidates.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[candidates[i],candidates[j]]=[candidates[j],candidates[i]]}
+ for(let k=0;k<mines;k++)data[candidates[k]].mine=true;
+ data.forEach((v,i)=>{if(!v.mine)v.n=around(i).reduce((s,j)=>s+(data[j].mine?1:0),0)});
+}
+function begin(i){if(started)return;started=true;first=i;plantMines(i);startTimer()}
+function openOne(i){
+ if(ended||data[i].open||data[i].flag)return;
+ if(!started)begin(i);
+ if(data[i].mine){data[i].open=true;finish(false);return}
+ const stack=[i];
+ while(stack.length){const j=stack.pop(),v=data[j];if(v.open||v.flag||v.mine)continue;v.open=true;if(v.n===0)for(const k of around(j))if(!data[k].open&&!data[k].flag&&!data[k].mine)stack.push(k)}
+ checkWin();render();
+}
+function handleClick(i){
+ if(ended)return;
+ const v=data[i];
+ if(v.open){if(v.n>0)chord(i);return}
+ if($('mode').value==='flag')toggleFlag(i);else openOne(i);
+}
+function toggleFlag(i){
+ if(ended||data[i].open)return;
+ if(!data[i].flag&&flagged>=mines)return;
+ data[i].flag=!data[i].flag;flagged+=data[i].flag?1:-1;updateStats();render();checkWin();
+}
+function chord(i){
+ const v=data[i];if(!v.open||!v.n)return;
+ const near=around(i),f=near.filter(j=>data[j].flag).length;
+ if(f<v.n)return;
+ const targets=near.filter(j=>!data[j].flag&&!data[j].open);
+ const hit=targets.find(j=>data[j].mine);
+ if(hit!==undefined){data[hit].open=true;finish(false);return}
+ targets.forEach(j=>openOne(j));
+}
+function checkWin(){if(data.every(v=>v.mine||v.open))finish(true)}
+function finish(win){
+ if(ended)return;ended=true;stopTimer();$('face').textContent=win?'😎':'😵';
+ setStatus(win?'クリア！ すべての安全なマスを開きました。':'ゲームオーバー。リスタートして再挑戦できます。');
+ if(!win){data.forEach(v=>{if(v.mine)v.open=true})}
+ render();
+}
+function applySettings(){
+ const key=$('level').value;
+ if(key==='custom'){
+  rows=Number($('rows').value);cols=Number($('cols').value);mines=Number($('mineCount').value);
+  if(!Number.isInteger(rows)||!Number.isInteger(cols)||!Number.isInteger(mines)||rows<5||cols<5||rows>100||cols>100||mines<1||mines>=rows*cols){alert('縦・横は5〜100、地雷数は1以上かつマス数未満で入力してください。');return}
+ }else [rows,cols,mines]=presets[key];
+ // Keep a guaranteed safe first click even for dense custom boards.
+ $('rows').value=rows;$('cols').value=cols;$('mineCount').value=mines;
+ createBoard();
+}
+function setZoom(z){zoom=Math.max(.55,Math.min(1.8,z));const px=Math.round(32*zoom);document.documentElement.style.setProperty('--cell',px+'px');$('zoomValue').textContent=Math.round(zoom*100)+'%'}
+$('level').addEventListener('change',()=>{$('customFields').classList.toggle('show',$('level').value==='custom')});
+$('apply').addEventListener('click',applySettings);
+$('reset').addEventListener('click',createBoard);$('newGameTop').addEventListener('click',createBoard);$('face').addEventListener('click',createBoard);
+$('flagToggle').addEventListener('click',()=>{$('mode').value=$('mode').value==='flag'?'open':'flag';$('flagToggle').classList.toggle('primary',$('mode').value==='flag');$('flagToggle').textContent=$('mode').value==='flag'?'⚑ 旗モード ON':'⚑ 旗モード'});
+$('mode').addEventListener('change',()=>{$('flagToggle').classList.toggle('primary',$('mode').value==='flag');$('flagToggle').textContent=$('mode').value==='flag'?'⚑ 旗モード ON':'⚑ 旗モード'});
+$('zoomIn').addEventListener('click',()=>setZoom(zoom+.15));$('zoomOut').addEventListener('click',()=>setZoom(zoom-.15));$('zoomReset').addEventListener('click',()=>setZoom(1));
+$('helpToggle').addEventListener('click',()=>$('help').classList.toggle('hidden'));
+$('shell').addEventListener('contextmenu',e=>e.preventDefault());
+setZoom(1);createBoard();
+})();
+</script>
+</body>
+</html>
